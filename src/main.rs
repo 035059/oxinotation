@@ -38,7 +38,7 @@ enum Event<I> {
 }
 
 #[derive(Serialize, Deserialize, Clone)]
-struct Pet {
+struct Note {
     id: usize,
     name: String,
     category: String,
@@ -49,14 +49,14 @@ struct Pet {
 #[derive(Copy, Clone, Debug)]
 enum MenuItem {
     Home,
-    Pets,
+    Notes,
 }
 
 impl From<MenuItem> for usize {
     fn from(input: MenuItem) -> usize {
         match input {
             MenuItem::Home => 0,
-            MenuItem::Pets => 1,
+            MenuItem::Notes => 1,
         }
     }
 }
@@ -92,10 +92,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut terminal = Terminal::new(backend)?;
     terminal.clear()?;
 
-    let menu_titles = vec!["Home", "Pets", "Add", "Delete", "Quit"];
+    let menu_titles = vec!["Home", "Notes", "Add", "Delete", "Quit"];
     let mut active_menu_item = MenuItem::Home;
-    let mut pet_list_state = ListState::default();
-    pet_list_state.select(Some(0));
+    let mut note_list_state = ListState::default();
+    note_list_state.select(Some(0));
 
     loop {
         terminal.draw(|rect| {
@@ -113,7 +113,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 )
                 .split(size);
 
-            let copyright = Paragraph::new("pet-CLI 2020 - all rights reserved")
+            let copyright = Paragraph::new("oxiNotation-CLI 2020 - all rights reserved")
                 .style(Style::default().fg(Color::LightCyan))
                 .alignment(Alignment::Center)
                 .block(
@@ -150,16 +150,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             rect.render_widget(tabs, chunks[0]);
             match active_menu_item {
                 MenuItem::Home => rect.render_widget(render_home(), chunks[1]),
-                MenuItem::Pets => {
-                    let pets_chunks = Layout::default()
+                MenuItem::Notes => {
+                    let notes_chunks = Layout::default()
                         .direction(Direction::Horizontal)
                         .constraints(
                             [Constraint::Percentage(20), Constraint::Percentage(80)].as_ref(),
                         )
                         .split(chunks[1]);
-                    let (left, right) = render_pets(&pet_list_state);
-                    rect.render_stateful_widget(left, pets_chunks[0], &mut pet_list_state);
-                    rect.render_widget(right, pets_chunks[1]);
+                    let (left, right) = render_notes(&note_list_state);
+                    rect.render_stateful_widget(left, notes_chunks[0], &mut note_list_state);
+                    rect.render_widget(right, notes_chunks[1]);
                 }
             }
             rect.render_widget(copyright, chunks[2]);
@@ -173,30 +173,30 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     break;
                 }
                 KeyCode::Char('h') => active_menu_item = MenuItem::Home,
-                KeyCode::Char('p') => active_menu_item = MenuItem::Pets,
+                KeyCode::Char('p') => active_menu_item = MenuItem::Notes,
                 KeyCode::Char('a') => {
-                    add_random_pet_to_db().expect("can add new random pet");
+                    add_random_note_to_db().expect("can add new random note");
                 }
                 KeyCode::Char('d') => {
-                    remove_pet_at_index(&mut pet_list_state).expect("can remove pet");
+                    remove_note_at_index(&mut note_list_state).expect("can remove note");
                 }
                 KeyCode::Down => {
-                    if let Some(selected) = pet_list_state.selected() {
-                        let amount_pets = read_db().expect("can fetch pet list").len();
-                        if selected >= amount_pets - 1 {
-                            pet_list_state.select(Some(0));
+                    if let Some(selected) = note_list_state.selected() {
+                        let amount_notes = read_db().expect("can fetch note list").len();
+                        if selected >= amount_notes - 1 {
+                            note_list_state.select(Some(0));
                         } else {
-                            pet_list_state.select(Some(selected + 1));
+                            note_list_state.select(Some(selected + 1));
                         }
                     }
                 }
                 KeyCode::Up => {
-                    if let Some(selected) = pet_list_state.selected() {
-                        let amount_pets = read_db().expect("can fetch pet list").len();
+                    if let Some(selected) = note_list_state.selected() {
+                        let amount_notes = read_db().expect("can fetch note list").len();
                         if selected > 0 {
-                            pet_list_state.select(Some(selected - 1));
+                            note_list_state.select(Some(selected - 1));
                         } else {
-                            pet_list_state.select(Some(amount_pets - 1));
+                            note_list_state.select(Some(amount_notes - 1));
                         }
                     }
                 }
@@ -217,11 +217,11 @@ fn render_home<'a>() -> Paragraph<'a> {
         Spans::from(vec![Span::raw("to")]),
         Spans::from(vec![Span::raw("")]),
         Spans::from(vec![Span::styled(
-            "pet-CLI",
+            "oxiNotation-CLI",
             Style::default().fg(Color::LightBlue),
         )]),
         Spans::from(vec![Span::raw("")]),
-        Spans::from(vec![Span::raw("Press 'p' to access pets, 'a' to add random new pets and 'd' to delete the currently selected pet.")]),
+        Spans::from(vec![Span::raw("Press 'p' to access notes, 'a' to add a new note and 'd' to delete the currently selected note.")]),
     ])
     .alignment(Alignment::Center)
     .block(
@@ -234,46 +234,46 @@ fn render_home<'a>() -> Paragraph<'a> {
     home
 }
 
-fn render_pets<'a>(pet_list_state: &ListState) -> (List<'a>, Table<'a>) {
-    let pets = Block::default()
+fn render_notes<'a>(note_list_state: &ListState) -> (List<'a>, Table<'a>) {
+    let notes = Block::default()
         .borders(Borders::ALL)
         .style(Style::default().fg(Color::White))
-        .title("Pets")
+        .title("")
         .border_type(BorderType::Plain);
 
-    let pet_list = read_db().expect("can fetch pet list");
-    let items: Vec<_> = pet_list
+    let note_list = read_db().expect("can fetch note list");
+    let items: Vec<_> = note_list
         .iter()
-        .map(|pet| {
+        .map(|note| {
             ListItem::new(Spans::from(vec![Span::styled(
-                pet.name.clone(),
+                note.name.clone(),
                 Style::default(),
             )]))
         })
         .collect();
 
-    let selected_pet = pet_list
+    let selected_note = note_list
         .get(
-            pet_list_state
+            note_list_state
                 .selected()
-                .expect("there is always a selected pet"),
+                .expect("there is always a selected note"),
         )
         .expect("exists")
         .clone();
 
-    let list = List::new(items).block(pets).highlight_style(
+    let list = List::new(items).block(notes).highlight_style(
         Style::default()
             .bg(Color::Yellow)
             .fg(Color::Black)
             .add_modifier(Modifier::BOLD),
     );
 
-    let pet_detail = Table::new(vec![Row::new(vec![
-        Cell::from(Span::raw(selected_pet.id.to_string())),
-        Cell::from(Span::raw(selected_pet.name)),
-        Cell::from(Span::raw(selected_pet.category)),
-        Cell::from(Span::raw(selected_pet.age.to_string())),
-        Cell::from(Span::raw(selected_pet.created_at.to_string())),
+    let note_detail = Table::new(vec![Row::new(vec![
+        Cell::from(Span::raw(selected_note.id.to_string())),
+        Cell::from(Span::raw(selected_note.name)),
+        Cell::from(Span::raw(selected_note.category)),
+        Cell::from(Span::raw(selected_note.age.to_string())),
+        Cell::from(Span::raw(selected_note.created_at.to_string())),
     ])])
     .header(Row::new(vec![
         Cell::from(Span::styled(
@@ -312,25 +312,25 @@ fn render_pets<'a>(pet_list_state: &ListState) -> (List<'a>, Table<'a>) {
         Constraint::Percentage(20),
     ]);
 
-    (list, pet_detail)
+    (list, note_detail)
 }
 
-fn read_db() -> Result<Vec<Pet>, Error> {
+fn read_db() -> Result<Vec<Note>, Error> {
     let db_content = fs::read_to_string(DB_PATH)?;
-    let parsed: Vec<Pet> = serde_json::from_str(&db_content)?;
+    let parsed: Vec<Note> = serde_json::from_str(&db_content)?;
     Ok(parsed)
 }
 
-fn add_random_pet_to_db() -> Result<Vec<Pet>, Error> {
+fn add_random_note_to_db() -> Result<Vec<Note>, Error> {
     let mut rng = rand::thread_rng();
     let db_content = fs::read_to_string(DB_PATH)?;
-    let mut parsed: Vec<Pet> = serde_json::from_str(&db_content)?;
+    let mut parsed: Vec<Note> = serde_json::from_str(&db_content)?;
     let catsdogs = match rng.gen_range(0, 1) {
         0 => "cats",
         _ => "dogs",
     };
 
-    let random_pet = Pet {
+    let random_note = Note {
         id: rng.gen_range(0, 9999999),
         name: rng.sample_iter(Alphanumeric).take(10).collect(),
         category: catsdogs.to_owned(),
@@ -338,22 +338,22 @@ fn add_random_pet_to_db() -> Result<Vec<Pet>, Error> {
         created_at: Utc::now(),
     };
 
-    parsed.push(random_pet);
+    parsed.push(random_note);
     fs::write(DB_PATH, &serde_json::to_vec(&parsed)?)?;
     Ok(parsed)
 }
 
-fn remove_pet_at_index(pet_list_state: &mut ListState) -> Result<(), Error> {
-    if let Some(selected) = pet_list_state.selected() {
+fn remove_note_at_index(note_list_state: &mut ListState) -> Result<(), Error> {
+    if let Some(selected) = note_list_state.selected() {
         let db_content = fs::read_to_string(DB_PATH)?;
-        let mut parsed: Vec<Pet> = serde_json::from_str(&db_content)?;
+        let mut parsed: Vec<Note> = serde_json::from_str(&db_content)?;
         parsed.remove(selected);
         fs::write(DB_PATH, &serde_json::to_vec(&parsed)?)?;
-        let amount_pets = read_db().expect("can fetch pet list").len();
+        let _amount_notes = read_db().expect("can fetch note list").len();
         if selected > 0 {
-            pet_list_state.select(Some(selected - 1));
+            note_list_state.select(Some(selected - 1));
         } else {
-            pet_list_state.select(Some(0));
+            note_list_state.select(Some(0));
         }
     }
     Ok(())
